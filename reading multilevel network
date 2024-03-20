@@ -4,6 +4,7 @@ install.packages("readxl")
 library(readxl)
 library(igraph)
 
+#### example to get the tabs
 # Read Excel file
 excel_file <- "Epiphyte_Data_2024_final.xlsx"  # Update with your file name
 tabs <- excel_sheets(excel_file)
