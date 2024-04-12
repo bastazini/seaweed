@@ -1,35 +1,30 @@
-install.packages("readxl")
+# Load required libraries
+library(igraph)
+library(vegan)
+
+# Set the working directory to where your files are located
+setwd("/path/to/your/files")
+
+# Read the CSV files
+epi_all_occ <- read.csv("Epi_All_Occ.csv", row.names = 1)
+epi_alg_occ <- read.csv("Epi_Alg_Occ.csv", row.names = 1)
+basio_alg_occ <- read.csv("Basio_Alg_Occ.csv", row.names = 1)
+
+# Binarize the data
+epi_all_binarized <- decostand(epi_all_occ, method = "pa")
+epi_alg_binarized <- decostand(epi_alg_occ, method = "pa")
+basio_alg_binarized <- decostand(basio_alg_occ, method = "pa")
+
 
 # Load required libraries
-library(readxl)
 library(igraph)
 
-#### example to get the tabs
-# Read Excel file
-excel_file <- "Epiphyte_Data_2024_final.xlsx"  # Update with your file name
-tabs <- excel_sheets(excel_file)
 
-# Define a function to process each tab
-process_tab <- function(tab_name) {
-  data <- read_excel(excel_file, sheet = tab_name)
-  
-  # Assuming your data has two columns: species1 and species2 representing interactions
-  
-  # Create a graph
-  g <- graph_from_data_frame(data, directed = FALSE)
-  
-  # Set the names of vertices based on unique species
-  V(g)$name <- unique(c(data$species1, data$species2))
-  
-  return(g)
-}
 
-# Apply the function to each tab and store the resulting graphs in a list
-graphs <- lapply(tabs, process_tab)
+# Create individual bipartite graphs for each layer
+bipartite_epi_all <- graph_from_incidence_matrix(as.matrix(epi_all_binarized), mode = "all")
+bipartite_epi_alg <- graph_from_incidence_matrix(as.matrix(epi_alg_binarized), mode = "all")
+bipartite_basio_alg <- graph_from_incidence_matrix(as.matrix(basio_alg_binarized), mode = "all")
 
-# Combine all graphs into a single multilevel network
-multilevel_network <- union(graphs)
-
-# Plot the multilevel network
-plot(multilevel_network, vertex.label.dist = 0.5)
-
+##mutilevel network
+graph_multi <- union(bipartite_epi_all, bipartite_epi_alg)
