@@ -16,9 +16,6 @@ epi_alg_binarized <- decostand(epi_alg_occ, method = "pa")
 basio_alg_binarized <- decostand(basio_alg_occ, method = "pa")
 
 
-# Load required libraries
-library(igraph)
-
 
 
 # Create individual bipartite graphs for each layer
@@ -28,3 +25,5 @@ bipartite_basio_alg <- graph_from_incidence_matrix(as.matrix(basio_alg_binarized
 
 ##mutilevel network
 graph_multi <- union(bipartite_epi_all, bipartite_epi_alg)
+
+plot(graph_multi)
