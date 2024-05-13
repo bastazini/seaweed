@@ -1,0 +1,17 @@
+# Load required library
+library(tidyr)
+library(dplyr)
+
+# Step 1: Read the biadjacency matrix from Excel
+df <- read.csv("Epi_All_Occ.csv", header = TRUE, row.names=1)
+
+# Convert row names to a column
+df <- tibble::rownames_to_column(df, var = "Species1")
+
+# Convert the data frame to long format
+long_table <- df %>%
+  pivot_longer(cols = -Species1, names_to = "Species2", values_to = "Value") %>%
+  filter(Value != 0)  # Optionally, filter out rows with zero values
+
+# Print the long table
+print(long_table)
