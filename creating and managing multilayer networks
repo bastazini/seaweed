@@ -1,0 +1,58 @@
+# Load required library
+require(mully)
+
+# Empty network
+g=mully("kelp_network",direct = F)
+
+###add layers
+g=addLayer(g, c("Epifite", "Basio", "Animal"))
+
+###remove duplicates form longtable
+remove_duplicates <- function(data) {
+  unique_data <- unique(data)
+  return(unique_data)
+}
+
+# Example usage
+# Assuming your data frame is named 'df'
+unique_df <- remove_duplicates(df)
+
+
+
+#printing nodes
+print_nodes <- function(data, column_index) {
+  for (i in 1:nrow(data)) {
+    species <- as.character(data[i, column_index])
+    cat('g=addNode(g,"', species, '","Basio")\n')
+  }
+}
+
+
+# Assuming you want to use the first column
+print_nodes(df, 2)
+
+# Example usage
+# Assuming your data frame is named 'df'
+print_interactions(df)
+
+
+######
+print_edges <- function(data) {
+  for (i in 1:nrow(data)) {
+    species1 <- as.character(data[i, 1])
+    species2 <- as.character(data[i, 2])
+    interaction <- as.character(data[i, 3])
+    cat('g=addEdge(g,"', species1, '","', species2, '",list(name="', interaction, '"))\n', sep = "")
+  }
+}
+
+# Example usage
+# Assuming your data frame is named 'df'
+print_edges(df)
+
+
+
+
+###Plotting networks
+plot(g,layout = "scaled")
+plot3d(g)
