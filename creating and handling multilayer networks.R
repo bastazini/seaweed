@@ -20,7 +20,7 @@ print_nodes <- function(data, column_index) {
     # Check if the species has already been printed
     if (!(species %in% printed_species)) {
       # Print the node only if it's not a duplicate
-      cat('g=addNode(g,"', species, '","Epifite")\n')
+      cat('g=addNode(g,"', species, '","Basio")\n')
       
       # Add the species to the vector of printed species
       printed_species <- c(printed_species, species)
@@ -39,7 +39,7 @@ print_edges <- function(data) {
     species1 <- as.character(data[i, 1])
     species2 <- as.character(data[i, 2])
     interaction <- as.character(data[i, 3])
-    cat('g=addEdge(g,"', species1, '","', species2, '"))\n', sep = "")
+    cat('g=addEdge(g,"', species1, '","', species2, '",list(name="', interaction, '"))\n', sep = "")
   }
 }
 

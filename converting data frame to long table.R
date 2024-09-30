@@ -2,12 +2,17 @@ rm(list=ls())
 # Load required library
 library(tidyr)
 library(dplyr)
+require(igraph)
 
 # Step 1: Read the biadjacency matrix from Excel
-df <- read.csv("Basio_All_Occ.csv", header = TRUE, row.names=1)
+df.epi <- read.csv("Epi_All_Occ.csv", header = TRUE, row.names=1)
+df.basio <- read.csv("Basio_All_Occ.csv", header = TRUE, row.names=1)
+
+
+My_graph <- graph_from_incidence_matrix(df,weighted = TRUE)
 
 # Convert row names to a column
-df <- tibble::rownames_to_column(df, var = "Species1")
+df.epi <- tibble::rownames_to_column(df.epi, var = "Species1")
 
 # Convert the data frame to long format
 long_table <- df %>%
@@ -25,4 +30,4 @@ remove_duplicates <- function(data) {
 
 # Example usage
 # Assuming your data frame is named 'df'
-unique_df <- remove_duplicates(long_table)
+unique_df1 <- remove_duplicates(long_table)
