@@ -25,7 +25,7 @@ nspp <- nrow(trait_data)
 gower_matrix <- daisy(trait_data, metric = "gower")
 pco <- dudi.pco(quasieuclid(gower_matrix), scannf = FALSE, nf = 2)
 
-# Complete pool of species (Partite C) in trait space
+# Complete pool of species in trait space
 all_pool <- cbind(pco$li[, 1:2], ext = FALSE, sp = rownames(trait_data))
 
 # Convex hull of the complete trait space
