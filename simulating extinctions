@@ -151,8 +151,7 @@ robust_table <- data.frame(
 kable(robust_table, format = "pipe")
 
 
-# Visualization of results
-lollipop plot
+# Visualization of results with lollipop plot
 ggplot(robust_table, aes(x = reorder(Metric, Robustness), y = Robustness)) +
   geom_segment(aes(xend = Metric, y = 0, yend = Robustness), color = "gray60", size = 1) +
   geom_point(color = "steelblue", size = 4) +
