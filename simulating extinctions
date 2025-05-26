@@ -4,6 +4,8 @@ rm(list = ls())
 library(cluster)
 library(ade4)
 library(knitr)
+library(ggplot2)
+
 
 # Data
 subnetwork1 <- read.csv("Basio_Affinity2.csv", header = TRUE, row.names = 1)
@@ -147,3 +149,18 @@ robust_table <- data.frame(
 )
 
 kable(robust_table, format = "pipe")
+
+
+# Visualization of results
+lollipop plot
+ggplot(robust_table, aes(x = reorder(Metric, Robustness), y = Robustness)) +
+  geom_segment(aes(xend = Metric, y = 0, yend = Robustness), color = "gray60", size = 1) +
+  geom_point(color = "steelblue", size = 4) +
+  coord_flip() +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Taxonomic and Functional Robustness",
+    x = "Metric",
+    y = "Robustness"
+  )
+
