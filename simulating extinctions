@@ -12,10 +12,11 @@ subnetwork1 <- read.csv("Basio_Affinity2.csv", header = TRUE, row.names = 1)
 subnetwork2 <- read.csv("Epi_Affinity2.csv", header = TRUE, row.names = 1)
 trait_data <- read.csv("Epi_TRA.csv", header = TRUE, row.names = 1)
 
-nspA <- 10
-nspB <- 259
-nspC <- 95
-nspp <- 26
+nspA <-nrow(subnetwork1)
+nspB <- ncol(subnetwork1)
+nspC <- nrow(subnetwork2)
+nspp <- nrow(trait_data)
+
 
 # Functional trait space from Gower distance
 gower_matrix <- daisy(trait_data, metric = "gower")
@@ -151,7 +152,8 @@ robust_table <- data.frame(
 kable(robust_table, format = "pipe")
 
 
-# Visualization of results with lollipop plot
+# Visualization of results
+#lollipop plot
 ggplot(robust_table, aes(x = reorder(Metric, Robustness), y = Robustness)) +
   geom_segment(aes(xend = Metric, y = 0, yend = Robustness), color = "gray60", size = 1) +
   geom_point(color = "steelblue", size = 4) +
