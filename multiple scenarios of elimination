@@ -1,169 +1,146 @@
-rm(list = ls())
-
 # Required packages
 library(cluster)
 library(ade4)
 library(knitr)
 library(ggplot2)
+library(dplyr)
 
-
-# Data
+# Load data
 subnetwork1 <- read.csv("Basio_Affinity2.csv", header = TRUE, row.names = 1)
 subnetwork2 <- read.csv("Epi_Affinity2.csv", header = TRUE, row.names = 1)
 trait_data <- read.csv("Epi_TRA.csv", header = TRUE, row.names = 1)
 
-subnetwork1=decostand(subnetwork1, method = "pa", margin = 1, na.rm = TRUE)
-subnetwork2=decostand(subnetwork2, method = "pa", margin = 1, na.rm = TRUE)
 
 nspA <-nrow(subnetwork1)
 nspB <- ncol(subnetwork1)
 nspC <- nrow(subnetwork2)
 nspp <- nrow(trait_data)
 
-
-# Functional trait space from Gower distance
+# Trait space
 gower_matrix <- daisy(trait_data, metric = "gower")
 pco <- dudi.pco(quasieuclid(gower_matrix), scannf = FALSE, nf = 2)
-
-# Complete pool of species (Partite C) in trait space
 all_pool <- cbind(pco$li[, 1:2], ext = FALSE, sp = rownames(trait_data))
-
-# Convex hull of the complete trait space
 a_pool <- all_pool[chull(all_pool[, 1:2]), ]
-
-# Shoelace formula for polygon area
 area_polygon <- function(coords) {
-  x <- coords[, 1]
-  y <- coords[, 2]
+  x <- coords[, 1]; y <- coords[, 2]
   0.5 * abs(sum(x * c(y[-1], y[1]) - c(x[-1], x[1]) * y))
 }
-
 area_total <- area_polygon(a_pool)
-
-# Degree centrality for Partite A
-degree_A <- rowSums(subnetwork1)
-order_A <- names(sort(degree_A, decreasing = TRUE))
 
 # Convert subnetwork1 to long format
 subnetwork1_df <- as.data.frame(as.table(as.matrix(subnetwork1)))
 names(subnetwork1_df) <- c("A", "B", "aff")
 subnetwork1_df <- subset(subnetwork1_df, aff == 1)
 
-# Run removal simulation
-results <- lapply(seq_len(nspA), function(n) {
-  rm_A <- order_A[1:n]
-  affected_B <- unique(subnetwork1_df$B[subnetwork1_df$A %in% rm_A])
-  
-  # Secondary extinctions from Partite B into Partite C
-  if (length(affected_B) > 0) {
-    linked_C <- colnames(subnetwork2)[colSums(subnetwork2[affected_B, , drop = FALSE]) > 0]
-  } else {
-    linked_C <- character(0)
-  }
-  
-  total_extinct <- unique(c(affected_B, linked_C))
-  
-  # Reduced trait space (total)
-  reduced_space <- subset(all_pool, !(sp %in% total_extinct))
-  area_reduced <- if (nrow(reduced_space) > 2) area_polygon(reduced_space[chull(reduced_space[, 1:2]), ]) else 0
-  RFS_total <- 1 - (area_reduced / area_total)
-  
-  # Reduced trait space for Partite C
-  reduced_C <- subset(all_pool, !(sp %in% linked_C))
-  area_reduced_C <- if (nrow(reduced_C) > 2) area_polygon(reduced_C[chull(reduced_C[, 1:2]), ]) else 0
-  RFS_C <- 1 - (area_reduced_C / area_total)
-  
-  # Reduced trait space for Partite B
-  reduced_B <- subset(all_pool, !(sp %in% affected_B))
-  area_reduced_B <- if (nrow(reduced_B) > 2) area_polygon(reduced_B[chull(reduced_B[, 1:2]), ]) else 0
-  RFS_B <- 1 - (area_reduced_B / area_total)
-  
-  list(
-    RFS = RFS_total,
-    RFS_B = RFS_B,
-    RFS_C = RFS_C,
-    SR_total = 1 - length(total_extinct) / nspp,
-    SR_partB = 1 - length(affected_B) / nspB,
-    SR_partC = 1 - length(linked_C) / nspC,
-    removed = rm_A
+# Simulation function
+simulate_removal <- function(order_A) {
+  lapply(seq_len(nspA), function(n) {
+    rm_A <- order_A[1:n]
+    affected_B <- unique(subnetwork1_df$B[subnetwork1_df$A %in% rm_A])
+    linked_C <- if (length(affected_B) > 0) {
+      colnames(subnetwork2)[colSums(subnetwork2[affected_B, , drop = FALSE]) > 0]
+    } else character(0)
+    
+    total_extinct <- unique(c(affected_B, linked_C))
+    reduced_space <- subset(all_pool, !(sp %in% total_extinct))
+    reduced_C <- subset(all_pool, !(sp %in% linked_C))
+    reduced_B <- subset(all_pool, !(sp %in% affected_B))
+    
+    area_reduced <- if (nrow(reduced_space) > 2) area_polygon(reduced_space[chull(reduced_space[, 1:2]), ]) else 0
+    area_reduced_C <- if (nrow(reduced_C) > 2) area_polygon(reduced_C[chull(reduced_C[, 1:2]), ]) else 0
+    area_reduced_B <- if (nrow(reduced_B) > 2) area_polygon(reduced_B[chull(reduced_B[, 1:2]), ]) else 0
+    
+    list(
+      RFS = 1 - (area_reduced / area_total),
+      RFS_B = 1 - (area_reduced_B / area_total),
+      RFS_C = 1 - (area_reduced_C / area_total),
+      SR_total = 1 - length(total_extinct) / nspp,
+      SR_partB = 1 - length(affected_B) / nspB,
+      SR_partC = 1 - length(linked_C) / nspC
+    )
+  })
+}
+
+# Robustness 
+get_robustness <- function(results) {
+  df <- data.frame(
+    no = 0:nspA / nspA,
+    remain_RFS = c(1, sapply(results, function(x) 1 - x$RFS)),
+    remain_RFS_B = c(1, sapply(results, function(x) 1 - x$RFS_B)),
+    remain_RFS_C = c(1, sapply(results, function(x) 1 - x$RFS_C)),
+    #remain_SR_total = c(1, sapply(results, function(x) x$SR_total)),
+    remain_SR_B = c(1, sapply(results, function(x) x$SR_partB)),
+    remain_SR_C = c(1, sapply(results, function(x) x$SR_partC))
   )
+  fit.hyperbolica <- function(object, col_y) {
+    x <- object$no
+    y <- object[[col_y]]
+    fit <- try(nls(y ~ 1 - x^a, start = list(a = 0.5)), silent = TRUE)
+    if (inherits(fit, "try-error")) {
+      fit <- nls((y + rnorm(length(y), sd = 0.001)) ~ 1 - x^a, start = list(a = 1))
+    }
+    preds <- predict(fit, newdata = data.frame(x = seq(0, 1, length.out = 100)))
+    list(x = seq(0, 1, length.out = 100), y = preds)
+  }
+  robustness_integrate <- function(curve) {
+    integrate(splinefun(curve$x, curve$y), 0, 1)$value
+  }
+  curves <- lapply(names(df)[-1], function(col) fit.hyperbolica(df, col))
+  names(curves) <- names(df)[-1]
+  sapply(curves, robustness_integrate)
+}
+
+# Scenario 1: Degree centrality
+order_deg <- names(sort(rowSums(subnetwork1), decreasing = TRUE))
+rob_deg <- get_robustness(simulate_removal(order_deg))
+
+# Scenario 2: Random (average over 10)
+rob_random <- replicate(1000, {
+  random_order <- sample(rownames(subnetwork1))
+  get_robustness(simulate_removal(random_order))
 })
+rob_random_mean <- rowMeans(rob_random)
 
-# Convert results to dataframe
-df_results <- data.frame(
-  no = 0:nspA / nspA,
-  remain_RFS = c(1, sapply(results, function(x) 1 - x$RFS)),
-  remain_RFS_B = c(1, sapply(results, function(x) 1 - x$RFS_B)),
-  remain_RFS_C = c(1, sapply(results, function(x) 1 - x$RFS_C)),
-  remain_SR_total = c(1, sapply(results, function(x) x$SR_total)),
-  remain_SR_B = c(1, sapply(results, function(x) x$SR_partB)),
-  remain_SR_C = c(1, sapply(results, function(x) x$SR_partC))
+# Scenario 3: Custom order (define your vector)
+
+order_custom <- c("A10", "A3", "A7", "A2", "A5", "A4", "A6", "A9", "A8", "A1") 
+rob_custom <- get_robustness(simulate_removal(order_custom))
+
+# Combine all results
+metric_names <- c( "SR_B", "SR_C", "FD_total", "FD_B", "FD_C")
+robust_df <- data.frame(
+  Metric = metric_names,
+  Degree_Centrality = rob_deg,
+  Random = rob_random_mean,
+  Custom = rob_custom
 )
 
-# Fit hyperbolic function
-fit.hyperbolica <- function(object, col_y) {
-  x <- object$no
-  y <- object[[col_y]]
-  fit <- try(nls(y ~ 1 - x^a, start = list(a = 0.5)), silent = TRUE)
-  if (inherits(fit, "try-error")) {
-    fit <- nls((y + rnorm(length(y), sd = 0.001)) ~ 1 - x^a, start = list(a = 1))
-  }
-  preds <- predict(fit, newdata = data.frame(x = seq(0, 1, length.out = 100)))
-  list(x = seq(0, 1, length.out = 100), y = preds, exponent = coef(fit)[1], model = fit)
-}
-
-# Fit and predict curves
-#curve_SR_total <- fit.hyperbolica(df_results, "remain_SR_total")
-curve_SR_B <- fit.hyperbolica(df_results, "remain_SR_B")
-curve_SR_C <- fit.hyperbolica(df_results, "remain_SR_C")
-curve_RFS <- fit.hyperbolica(df_results, "remain_RFS")
-curve_RFS_C <- fit.hyperbolica(df_results, "remain_RFS_C")
-curve_RFS_B <- fit.hyperbolica(df_results, "remain_RFS_B")
-
-# Compute robustness via area under curve
-robustness_integrate <- function(curve) {
-  integrate(splinefun(curve$x, curve$y), 0, 1)$value
-}
-
-#robust_SR_total <- robustness_integrate(curve_SR_total)
-robust_SR_B <- robustness_integrate(curve_SR_B)
-robust_SR_C <- robustness_integrate(curve_SR_C)
-robust_RFS <- robustness_integrate(curve_RFS)
-robust_RFS_C <- robustness_integrate(curve_RFS_C)
-robust_RFS_B <- robustness_integrate(curve_RFS_B)
-
-# Output table
-robust_table <- data.frame(
-  Metric = c(
-    #"SR_total", 
-    "SR_partB", 
-    "SR_partC", 
-    "Functional_Diversity_Total", 
-    "Functional_Diversity_PartC",
-    "Functional_Diversity_PartB"
-  ),
-  Robustness = c(
-    #robust_SR_total, 
-    robust_SR_B, 
-    robust_SR_C, 
-    robust_RFS, 
-    robust_RFS_C,
-    robust_RFS_B
-  )
-)
-
-kable(robust_table, format = "pipe")
+##
 
 
-# Visualization of results
-#lollipop plot
-ggplot(robust_table, aes(x = reorder(Metric, Robustness), y = Robustness)) +
-  geom_segment(aes(xend = Metric, y = 0, yend = Robustness), color = "gray60", size = 1) +
-  geom_point(color = "steelblue", size = 4) +
-  coord_flip() +
+# Reshape for plotting
+library(tidyr)
+robust_long <- pivot_longer(robust_df, -Metric, names_to = "Scenario", values_to = "Robustness")
+
+# Convert Metric to factor (if not already) and assign numeric positions
+robust_long$Metric <- factor(robust_long$Metric, levels = unique(robust_long$Metric))
+robust_long$Metric_num <- as.numeric(robust_long$Metric)
+
+# Define dodge width
+dodge_width <- 0.3
+
+# Map each scenario to an offset for dodging
+scenario_levels <- unique(robust_long$Scenario)
+offsets <- setNames(seq(-dodge_width, dodge_width, length.out = length(scenario_levels)), scenario_levels)
+
+# Add offset based on scenario
+robust_long$x_dodge <- robust_long$Metric_num + offsets[robust_long$Scenario]
+
+# Plot
+ggplot(robust_long, aes(x = x_dodge, y = Robustness, color = Scenario)) +
+  geom_segment(aes(x = x_dodge, xend = x_dodge, y = 0, yend = Robustness), size = 1) +
+  geom_point(size = 4) +
+  scale_x_continuous(breaks = unique(robust_long$Metric_num), labels = levels(robust_long$Metric)) +
   theme_minimal(base_size = 14) +
-  labs(
-    title = "Taxonomic and Functional Robustness",
-    x = "Metric",
-    y = "Robustness"
-  )
+  labs(title = "Robustness under Different Extinction Scenarios", x = "Metric", y = "Robustness") +
+  coord_flip()
